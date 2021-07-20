@@ -47,13 +47,30 @@ def visit_Call(
             node.func.attr == 'lru_cache' and
             isinstance(node.func.value, ast.Name) and
             node.func.value.id == 'functools' and
-            not node.args and
-            len(node.keywords) == 1 and
-            node.keywords[0].arg == 'maxsize' and
-            isinstance(node.keywords[0].value, ast.NameConstant) and
-            node.keywords[0].value.value is None
+            not node.args
     ):
-        func = functools.partial(
-            find_and_replace_call, template='functools.cache',
-        )
-        yield ast_to_offset(node), func
+        maxsize = None
+        typed = None
+        for keyword in node.keywords:
+            if keyword.arg == 'maxsize':
+                maxsize = keyword.value
+            elif keyword.arg == 'typed':
+                typed = keyword.value
+            else:
+                # garbage
+                return
+        if (
+            isinstance(maxsize, ast.NameConstant) and
+            maxsize.value is None and
+            (
+                typed is None or
+                (
+                    isinstance(typed, ast.Constant) and
+                    typed.value is False
+                )
+            )
+        ):
+            func = functools.partial(
+                find_and_replace_call, template='functools.cache',
+            )
+            yield ast_to_offset(node), func
